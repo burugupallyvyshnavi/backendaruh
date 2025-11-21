@@ -1,38 +1,34 @@
 import { MongoClient } from "mongodb";
 
-let cachedClient = null;
+const uri = process.env.MONGO_URI;
+const client = new MongoClient(uri);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Only POST allowed" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    if (!cachedClient) {
-      cachedClient = new MongoClient(process.env.MONGO_URI);
-      await cachedClient.connect();
-    }
+    const { name, email, phone, whatsapp_updates } = req.body;
 
-    const db = cachedClient.db("aruhDB");
-    const leads = db.collection("leads");
+    await client.connect();
+    const db = client.db("estimatesDB");
+    const collection = db.collection("submissions");
 
-    const doc = {
-      ...req.body,
-      submittedAt: new Date()
-    };
-
-    const result = await leads.insertOne(doc);
-
-    res.status(200).json({
-      success: true,
-      message: "Form submitted successfully!",
-      id: result.insertedId
+    await collection.insertOne({
+      name,
+      email,
+      phone,
+      whatsapp_updates,
+      createdAt: new Date(),
     });
 
+    return res.status(200).json({ message: "Data stored successfully" });
   } catch (err) {
-    console.error("Error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("MongoDB Error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  } finally {
+    await client.close();
   }
 }
-
 
