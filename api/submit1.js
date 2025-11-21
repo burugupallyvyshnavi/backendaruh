@@ -1,7 +1,15 @@
 import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGO_URI;
-const client = new MongoClient(uri);
+let client;
+let clientPromise;
+
+// Prevent multiple connections in Vercel
+if (!global._mongoClientPromise) {
+  client = new MongoClient(uri);
+  global._mongoClientPromise = client.connect();
+}
+clientPromise = global._mongoClientPromise;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -11,7 +19,7 @@ export default async function handler(req, res) {
   try {
     const { name, email, phone, whatsapp_updates } = req.body;
 
-    await client.connect();
+    const client = await clientPromise;
     const db = client.db("estimatesDB");
     const collection = db.collection("submissions");
 
@@ -27,8 +35,6 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("MongoDB Error:", err);
     return res.status(500).json({ error: "Internal server error" });
-  } finally {
-    await client.close();
   }
 }
 
